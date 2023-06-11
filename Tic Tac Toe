@@ -1,0 +1,333 @@
+#include <iostream>
+#include <vector>
+#include <limits>
+#include <tuple>
+
+using namespace std;
+
+// Pole planszy
+enum class CellState { Empty, X, O };
+
+// Plansza
+class Board {
+private:
+    vector<vector<CellState>> cells;
+    int size;
+    int winCount;
+    int maxDepth = 0;
+
+public:
+    Board(int boardSize, int countToWin) {
+        this->size = boardSize;
+        this->winCount = countToWin;
+        this->maxDepth = 8;
+        cells.resize(size, vector<CellState>(size, CellState::Empty));
+    }
+
+    int MaxDepth() {
+        return maxDepth;
+    }
+
+    int Size() {
+        return size;
+    }
+
+    int WinCount() {
+        return winCount;
+    }
+
+    bool isFull() {
+        for (int i = 0; i < size; ++i) {
+            for (int j = 0; j < size; ++j) {
+                if (cells[i][j] == CellState::Empty) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+
+    bool isWinningMove(CellState player) {
+
+        // Sprawdzanie wygranych w poziomie
+        for (int i = 0; i < size; ++i) {
+            int count = 0;
+            for (int j = 0; j < size; ++j) {
+                if (cells[i][j] == player) {
+                    count++;
+                    if (count == winCount) {
+                        return true;
+                    }
+                }
+                else {
+                    count = 0;
+                }
+            }
+        }
+
+        // Sprawdzanie wygranych w pionie
+        for (int j = 0; j < size; ++j) {
+            int count = 0;
+            for (int i = 0; i < size; ++i) {
+                if (cells[i][j] == player) {
+                    count++;
+                    if (count == winCount) {
+                        return true;
+                    }
+                }
+                else {
+                    count = 0;
+                }
+            }
+        }
+
+        // Sprawdzanie wygranych na skos
+        int count = 0;
+        for (int k = 0; k < size; k++) {
+            for (int i = 0; i < size; ++i) {
+                if (cells[i][i] == player) {
+                    count++;
+                    if (count == winCount) {
+                        return true;
+                    }
+                }
+                else {
+                    count = 0;
+                }
+            }
+        }
+
+        count = 0;
+        for (int k = 0; k < size; k++) {
+            for (int i = 0; i < size; ++i) {
+                if (cells[i][size - 1 - i] == player) {
+                    count++;
+                    if (count == winCount) {
+                        return true;
+                    }
+                }
+                else {
+                    count = 0;
+                }
+            }
+        }
+        return false;
+    }
+
+
+    bool isTerminalState() {
+        if (isFull()) {
+            return true;
+        }
+        for (int i = 0; i < size; ++i) {
+            for (int j = 0; j < size; ++j) {
+                if (cells[i][j] != CellState::Empty) {
+                    if (isWinningMove(CellState::X) || isWinningMove(CellState::O)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    vector<pair<int, int>> getPossibleMoves() {
+        vector<pair<int, int>> moves;
+        for (int i = 0; i < size; ++i) {
+            for (int j = 0; j < size; ++j) {
+                if (cells[i][j] == CellState::Empty) {
+                    moves.push_back({ i, j });
+                }
+            }
+        }
+        return moves;
+    }
+
+    void makeMove(const pair<int, int>& move, CellState player) {
+        cells[move.first][move.second] = player;
+    }
+
+    void undoMove(const pair<int, int>& move) {
+        cells[move.first][move.second] = CellState::Empty;
+    }
+
+    void printBoard() {
+        for (int i = 0; i < size; ++i) {
+            for (int j = 0; j < size; ++j) {
+                char symbol;
+                if (cells[i][j] == CellState::X) {
+                    symbol = 'X';
+                }
+                else if (cells[i][j] == CellState::O) {
+                    symbol = 'O';
+                }
+                else {
+                    symbol = '-';
+                }
+                cout << symbol << " ";
+            }
+            cout << endl;
+        }
+        cout << endl;
+    }
+};
+
+
+
+// MinMax z alfa-beta cięciami
+int minimax(Board& board, int depth, int alpha, int beta, bool maximizingPlayer) {
+   
+    
+        if (board.isTerminalState()||depth == board.MaxDepth()) {
+            
+            if (maximizingPlayer) {
+                return -1; // Przegrana
+            }
+            else  if (board.isFull()) {
+                return 0; // Remis
+            }
+            else {
+                return 1; // Wygrana
+            }
+            
+        }
+
+        pair<int, int> bestMove{ -1, -1 };
+        
+
+        if (maximizingPlayer) {
+            int maxEval = numeric_limits<int>::min();
+
+            vector<pair<int, int>> moves = board.getPossibleMoves();
+            for (const pair<int, int>& move : moves) {
+                board.makeMove(move, CellState::X);
+                int eval = minimax(board, depth + 1, alpha, beta, false);
+                board.undoMove(move);
+
+
+                if (eval > maxEval) {
+                    maxEval = eval;
+                    bestMove = move;
+                }
+                alpha = max(alpha, maxEval);
+                if (beta <= alpha) {
+                    break; // Alfa-beta cięcie
+                }
+
+            }
+
+            return maxEval;
+        }
+        else {
+            int minEval = numeric_limits<int>::max();
+
+            vector<pair<int, int>> moves = board.getPossibleMoves();
+            for (const pair<int, int>& move : moves) {
+                board.makeMove(move, CellState::O);
+                int eval = minimax(board, depth + 1, alpha, beta, true);
+                board.undoMove(move);
+
+                minEval = min(minEval, eval);
+                beta = min(beta, minEval);
+                if (beta <= alpha) {
+                    break; // Alfa-beta cięcie
+
+                }
+
+            }
+
+            return minEval;
+        }
+}
+
+// Ruch komputera
+void makeComputerMove(Board& board) {
+    int bestScore = numeric_limits<int>::max();
+    pair<int, int> bestMove{ -1,-1 };
+
+    vector<pair<int, int>> moves = board.getPossibleMoves();
+    for (const pair<int, int>& move : moves) {
+        board.makeMove(move, CellState::O);
+        int score = minimax(board, 0, numeric_limits<int>::min(), numeric_limits<int>::max(), true);
+        board.undoMove(move);
+
+        if (score < bestScore) {
+            bestScore = score;
+            bestMove = move;
+        }
+    }
+    if (bestMove.first != -1 && bestMove.second != -1) {
+        board.makeMove(bestMove, CellState::O);
+    }
+}
+
+// Gra
+void playGame(int boardSize, int winCount) {
+    Board board(boardSize, winCount);
+
+    cout << "Rozpoczyna się gra w kolko i krzyzyk!" << endl;
+    cout << "Plansza o rozmiarze: " << boardSize << "x" << boardSize << endl;
+    cout << "Wygrana wymaga " << winCount << " znakow w rzedzie." << endl;
+    cout << endl;
+
+    bool playerTurn = true; 
+
+    while (!board.isTerminalState() && !board.isFull()) {
+        if (playerTurn) {
+            cout << "Twoj ruch! Podaj numer wiersza (1-" << boardSize << "): ";
+            int row;
+            cin >> row;
+            cout << "Podaj numer kolumny (1-" << boardSize << "): ";
+            int col;
+            cin >> col;
+
+            pair<int, int> playerMove{ row-1, col-1 };
+            if (board.getPossibleMoves().size() > 0) {
+                vector<pair<int,int>> possibleMoves = board.getPossibleMoves();
+                while (find(possibleMoves.begin(), possibleMoves.end(), playerMove) == possibleMoves.end()) {
+
+                    cout << "Nieprawidlowy ruch. Podaj poprawne koordynaty: ";
+                    cin >> row;
+                    cin >> col;
+                    playerMove = { row-1, col-1 };
+                }
+                board.makeMove(playerMove, CellState::X);
+                playerTurn = false;
+            }
+        }
+        else {
+            cout << "Ruch komputera..." << endl;
+
+            makeComputerMove(board);
+         
+            playerTurn = true;
+        }
+
+        board.printBoard();
+    }
+
+    if (board.isWinningMove(CellState::X)) {
+        cout << "Gratulacje! Wygrales!" << endl;
+    }
+    else if (board.isWinningMove(CellState::O)) {
+        cout << "Przegrales! Komputer wygral!" << endl;
+    }
+    else {
+        cout << "Remis!" << endl;
+    }
+}
+
+int main() {
+    int boardSize;
+    int winCount;
+
+    cout << "Podaj rozmiar planszy (kwadratowej): ";
+    cin >> boardSize;
+    cout << "Podaj ilosc znakow w rzedzie potrzebnych do wygranej: ";
+    cin >> winCount;
+
+    playGame(boardSize, winCount);
+
+    return 0;
+}
